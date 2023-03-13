@@ -1,0 +1,6 @@
+package rest
+
+const (
+	GITHUB_GET_RUNS = "GITHUB_GET_RUNS"
+	GITHUB_DISPATCH = "GITHUB_DISPATCH"
+)
