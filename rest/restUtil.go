@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -51,4 +52,24 @@ func BuildUrl(host string, repoPath string, tailUrl string) string {
 	tailUrl = strings.TrimSuffix(tailUrl, "/")
 
 	return (host + "/" + repoPath + "/" + tailUrl)
+}
+
+func LogJson(v any) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	log.Println(JsonPrettyPrint(string(b)))
+}
+
+func BuildRequest() GHRequest {
+	args := os.Args
+	var ghRequest GHRequest
+	ghRequest.Action = args[1]
+	ghRequest.Host = args[2]
+	ghRequest.Token = args[3]
+	ghRequest.RepoPath = args[4]
+	ghRequest.ID = args[5]
+	return ghRequest
 }

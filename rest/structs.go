@@ -1,9 +1,5 @@
 package rest
 
-import (
-	"time"
-)
-
 type GHActor struct {
 	Login string `json:"login"`
 	ID    int    `json:"id"`
@@ -21,12 +17,12 @@ type GHUser struct {
 }
 
 type GHHeadCommit struct {
-	ID        string    `json:"id"`
-	TreeID    string    `json:"tree_id"`
-	Message   string    `json:"message"`
-	Timestamp time.Time `json:"timestamp"`
-	Author    GHUser    `json:"author"`
-	Committer GHUser    `json:"committer"`
+	ID        string `json:"id"`
+	TreeID    string `json:"tree_id"`
+	Message   string `json:"message"`
+	Timestamp string `json:"timestamp"`
+	Author    GHUser `json:"author"`
+	Committer GHUser `json:"committer"`
 }
 
 type GHWorkflowRun struct {
@@ -42,8 +38,8 @@ type GHWorkflowRun struct {
 	Conclusion string       `json:"conclusion"`
 	WorkflowID int          `json:"workflow_id"`
 	HTMLURL    string       `json:"html_url"`
-	CreatedAt  time.Time    `json:"created_at"`
-	UpdatedAt  time.Time    `json:"updated_at"`
+	CreatedAt  string       `json:"created_at"`
+	UpdatedAt  string       `json:"updated_at"`
 	RunAttempt int          `json:"run_attempt"`
 	Actor      GHActor      `json:"actor"`
 	Repository GHRepository `json:"repository"`
@@ -51,5 +47,62 @@ type GHWorkflowRun struct {
 }
 
 type GHWorkflowRunInfo struct {
-	Runs []GHWorkflowRun `json:"workflow_runs"`
+	TotalCount int             `json:"total_count"`
+	Runs       []GHWorkflowRun `json:"workflow_runs"`
+}
+
+type GHJobStep struct {
+	Name        string `json:"name"`
+	Status      string `json:"status"`
+	Conclusion  string `json:"conclusion"`
+	Number      int    `json:"number"`
+	StartedAt   string `json:"started_at"`
+	CompletedAt string `json:"completed_at"`
+}
+
+type GHJob struct {
+	ID          int         `json:"id"`
+	RunID       int64       `json:"run_id"`
+	RunAttempt  int         `json:"run_attempt"`
+	Status      string      `json:"status"`
+	Conclusion  string      `json:"conclusion"`
+	CreatedAt   string      `json:"created_at"`
+	StartedAt   string      `json:"started_at"`
+	CompletedAt string      `json:"completed_at"`
+	Name        string      `json:"name"`
+	Steps       []GHJobStep `json:"steps"`
+	CheckRunURL string      `json:"check_run_url"`
+	Labels      []string    `json:"labels"`
+	RunnerID    int         `json:"runner_id"`
+	RunnerName  string      `json:"runner_name"`
+}
+
+type GHJobInfo struct {
+	ID   int     `json:"id"`
+	Jobs []GHJob `json:"jobs"`
+}
+
+type GHJobLog struct {
+	ID   string   `json:"id"`
+	Logs []string `json:"logs"`
+}
+type GHRunLogs struct {
+	ID      int64    `json:"id"`
+	RunLogs []string `json:"run_logs"`
+}
+
+type GHResult[T any] struct {
+	Url        string    `json:"url"`
+	Params     GHRequest `json:"params"`
+	StatusCode int       `json:"status_code"`
+	Message    string    `json:"message"`
+	Result     T         `json:"result"`
+}
+
+type GHRequest struct {
+	Action   string `json:"action"`
+	Host     string `json:"host"`
+	Token    string `json:"token"`
+	RepoPath string `json:"repo_path"`
+	ID       string `json:"id"`
 }
