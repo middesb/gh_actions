@@ -26,8 +26,9 @@ type GHHeadCommit struct {
 }
 
 type GHWorkflowRun struct {
-	ID         int          `json:"id"`
-	Name       string       `json:"name"`
+	ID   int    `json:"id"`
+	Name string `json:"
+	"`
 	NodeID     string       `json:"node_id"`
 	HeadBranch string       `json:"head_branch"`
 	HeadSha    string       `json:"head_sha"`

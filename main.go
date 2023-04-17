@@ -16,10 +16,6 @@ func main() {
 
 		actions.RunCompleteWorkflow(ghRequest)
 
-	} else if ghRequest.Action == common.TRIGGER_WORKFLOW_BY_WFID {
-
-		actions.TriggerWorkflow(ghRequest)
-
 	} else if ghRequest.Action == common.RERUN_WORKFLOW_BY_RUNID {
 
 		actions.RerunWorkflow(ghRequest)
@@ -30,9 +26,7 @@ func main() {
 
 	} else if ghRequest.Action == common.GET_WF_RUN_BY_RUNID {
 
-		ghResult := actions.GetWorkflowRunByRunId(ghRequest)
-		run := ghResult.Result
-		util.WriteResult(run)
+		actions.GetWorkflowRunByRunId(ghRequest)
 
 	} else if ghRequest.Action == common.GET_JOBS_BY_RUNID {
 
@@ -42,11 +36,6 @@ func main() {
 	} else if ghRequest.Action == common.GET_JOB_LOG_BY_JOBID {
 
 		ghResult := actions.GetJobLogsByJobId(ghRequest)
-		util.LogJson(ghResult)
-
-	} else if ghRequest.Action == common.GET_RUN_LOGS_BY_RUNID {
-
-		ghResult := actions.GetRunLogsByRunId(ghRequest)
 		util.LogJson(ghResult)
 
 	}

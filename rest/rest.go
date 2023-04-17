@@ -5,6 +5,18 @@ import (
 	"net/http"
 )
 
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+var (
+	Client HTTPClient
+)
+
+func init() {
+	Client = &http.Client{}
+}
+
 func Get(url string, bearerToken string) (*http.Response, string) {
 	// Create a Bearer string by appending string access token
 	var bearer = "Bearer " + bearerToken
@@ -18,10 +30,7 @@ func Get(url string, bearerToken string) (*http.Response, string) {
 	// add authorization header to the req
 	req.Header.Add("Authorization", bearer)
 
-	// Send req using http Client
-	client := &http.Client{}
-
-	resp, err := client.Do(req)
+	resp, err := Client.Do(req)
 
 	if err != nil {
 		return nil, "Error on invoking GET call client.\n[ERROR] -" + err.Error()
@@ -43,17 +52,11 @@ func Post(url string, bearerToken string, jsonBytes []byte) (int, string) {
 	// add authorization header to the req
 	req.Header.Add("Authorization", bearer)
 
-	// Send req using http Client
-	client := &http.Client{}
-	resp, err := client.Do(req)
-
-	defer resp.Body.Close()
+	resp, err := Client.Do(req)
 
 	if err != nil || resp.StatusCode > 299 {
 		return resp.StatusCode, "Error on response.\n[ERROR] -" + resp.Status
 	}
-
-	//errStr := LogResponse(resp)
-
+	defer resp.Body.Close()
 	return resp.StatusCode, ""
 }

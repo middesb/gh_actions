@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/exp/slices"
 )
 
 /*
@@ -37,11 +39,12 @@ func GetRunsByWorkflowId(ghRequest common.GHRequest, isCompleted bool) common.GH
 	}
 
 	runs := new(common.GHWorkflowRunInfo)
-	errStr = util.FetchObjectFromBody(resp, runs)
+	errStr = util.FetchObjectFromBody(resp, &runs)
 
 	if errStr == "" {
 		result.Result = *runs
 		result.StatusCode = resp.StatusCode
+		//util.Log("runs recd 2:", result.Result)
 		return result
 	}
 	result.Message = "Error in GET request for " + ghRequest.Action + " [ERROR] - Unmarshalling -" + errStr
@@ -132,7 +135,7 @@ func FetchTriggeredRun(workflowid string, lastRunTimestamp string, runInfo commo
 	for i := 0; i < len(runInfo.Runs); i++ {
 		run := runInfo.Runs[i]
 		workflowIdStr := strconv.Itoa(run.WorkflowID)
-		//	Log("WorkflowID:", workflowIdStr, "inworkflowid:", workflowId, workflowIdStr == workflowId)
+		util.Log("WorkflowID:", workflowIdStr, "inworkflowid:", workflowid)
 		if workflowIdStr == workflowid && run.CreatedAt != lastRunTimestamp {
 			//		Log("Debug : ID:", run.ID, "WorkflowID:", run.WorkflowID, "inworkflowid:", workflowId, "lastrunTimestamp:", lastRunTimestamp, "Actor:", run.Actor.Login, "Created:", run.CreatedAt, "Status:", run.Status)
 
@@ -223,35 +226,6 @@ func GetJobLogsByJobId(ghRequest common.GHRequest) common.GHResult[common.GHJobL
 }
 
 /*
-Fetch All Logs for all Jobs in a Run
-*/
-func GetRunLogsByRunId(ghRequest common.GHRequest) common.GHResult[[]string] {
-
-	ghResultJobs := GetJobsByRunId(ghRequest)
-	jobs := ghResultJobs.Result.Jobs
-
-	var runLogs common.GHResult[[]string]
-
-	runLogs.Params = ghRequest
-	runLogs.Url = ghResultJobs.Url
-
-	temp := ""
-	for i := 0; i < len(jobs); i++ {
-		jobIdStr := strconv.Itoa(jobs[i].ID)
-		ghRequest.ID = jobIdStr
-		ghJobLogs := GetJobLogsByJobId(ghRequest)
-		temp = temp + strings.Join(ghJobLogs.Result.Logs, "\r\n")
-		runLogs.Message = ghJobLogs.Message
-		runLogs.StatusCode = ghJobLogs.StatusCode
-
-	}
-	splitLines := strings.Split(strings.ReplaceAll(temp, "\r\n", "\n"), "\n")
-	runLogs.Result = splitLines
-
-	return runLogs
-}
-
-/*
 Helper to dispatch a Workflow called from Trigger Workflow
 */
 func RunWorkflowById(ghRequest common.GHRequest) common.GHResult[int] {
@@ -306,72 +280,13 @@ func RerunWorkflowByRunId(ghRequest common.GHRequest) common.GHResult[int] {
 }
 
 /*
-Trigger A Workflow  by workflow Id and also Fetch and Log triggerred run
-*/
-func TriggerWorkflow(ghRequest common.GHRequest) {
-
-	// fetch last run for the workflow Id
-	ghResultRuns := GetRunsByWorkflowId(ghRequest, false)
-	if ghResultRuns.StatusCode > 199 && ghResultRuns.StatusCode < 400 {
-		// init the last run timestamp as current
-		lastRunTimeStamp := time.Now().UTC().Format(time.RFC3339)
-		runsInfo := ghResultRuns.Result
-
-		runs := runsInfo.Runs
-
-		if runsInfo.TotalCount > 0 {
-			// if run exists then fetch the last timestamp from it
-			lastRunTimeStamp = runs[0].CreatedAt
-		}
-
-		// trigger workflow
-		ghResultInt := RunWorkflowById(ghRequest)
-
-		if ghResultInt.StatusCode > 199 && ghResultInt.StatusCode < 400 {
-
-			retries := 5
-			for retries > 0 {
-				time.Sleep(5 * time.Second)
-				// fetch last run for the workflow Id
-				ghResultRuns = GetWorkflowRunsSince(ghRequest, lastRunTimeStamp)
-
-				for ghResultRuns.StatusCode > 199 && ghResultRuns.StatusCode < 400 {
-					runsInfo := ghResultRuns.Result
-
-					// fetch triggered Run
-					run := FetchTriggeredRun(ghRequest.ID, lastRunTimeStamp, runsInfo)
-					// if run exists
-					if run != nil {
-						var result common.GHResult[common.GHWorkflowRun]
-						result.Result = *run
-						result.Url = ghResultInt.Url
-						result.StatusCode = ghResultRuns.StatusCode
-						result.Params = ghRequest
-						util.LogJson(result)
-						return
-					}
-				}
-				retries--
-			}
-
-			ghResultInt.Message = "Error  - " + ghRequest.Action + " request failed  fetching Last  run for WorkflowId " + ghRequest.ID + " [Retry Count  Remaining - 0] -"
-			ghResultInt.StatusCode = 400
-
-		}
-		util.LogJson(ghResultInt)
-		return
-	}
-
-	util.LogJson(ghResultRuns)
-}
-
-/*
 Rerun workflow and fetch and Log the Run results
 */
-func RerunWorkflow(ghRequest common.GHRequest) {
+func RerunWorkflow(ghRequest common.GHRequest) int {
 
 	// fetch last run for the workflow Id
 	ghResultRun := GetWorkflowRunByRunId(ghRequest)
+	//util.Log("1:", ghResultRun.StatusCode)
 	if ghResultRun.StatusCode > 199 && ghResultRun.StatusCode < 400 {
 
 		run := ghResultRun.Result
@@ -380,19 +295,20 @@ func RerunWorkflow(ghRequest common.GHRequest) {
 
 		// trigger workflow
 		ghResultInt := RerunWorkflowByRunId(ghRequest)
-
+		//util.Log("2:", ghResultRun.StatusCode)
 		if ghResultInt.StatusCode > 199 && ghResultInt.StatusCode < 400 {
 
 			retries := 5
 			for retries > 0 {
 				time.Sleep(5 * time.Second)
 				ghResultRun = GetWorkflowRunByRunId(ghRequest)
+				//util.Log("3:", ghResultRun.StatusCode)
 				run := ghResultRun.Result
 
 				if ghResultRun.StatusCode > 199 && ghResultRun.StatusCode < 400 && run.RunAttempt > lastRunAttempt {
 					ghResultRun.Url = ghResultInt.Url
-					util.LogJson(ghResultRun)
-					return
+
+					return 0
 				}
 				retries--
 			}
@@ -402,8 +318,10 @@ func RerunWorkflow(ghRequest common.GHRequest) {
 
 		}
 		util.LogJson(ghResultInt)
+		return 2
 	}
 	util.LogJson(ghResultRun)
+	return 1
 
 }
 
@@ -421,7 +339,7 @@ func GetCompletedRunsByWorkflowId(ghRequest common.GHRequest) {
 /*
 Run the Workflow and wait for all the jobs/steps to complete log information periodically until workflow completes
 */
-func RunCompleteWorkflow(ghRequest common.GHRequest) {
+func RunCompleteWorkflow(ghRequest common.GHRequest) int {
 
 	// trigger workflow
 	// fetch last run for the workflow Id
@@ -454,14 +372,15 @@ func RunCompleteWorkflow(ghRequest common.GHRequest) {
 
 					// fetch triggered Run
 					run := FetchTriggeredRun(ghRequest.ID, lastRunTimeStamp, runsInfo)
+					//util.Log(run)
 					// if run exists
 					if run != nil {
 						var result common.GHResult[common.GHWorkflowRun]
 						result.Result = *run
 
-						ghStatusResult := GetRunJobStatus(ghRequest, *run)
-						util.LogJson(ghStatusResult)
-						return
+						GetRunJobStatus(ghRequest, *run)
+						//util.LogJson(ghStatusResult)
+						return 0
 					}
 				}
 				retries--
@@ -472,10 +391,11 @@ func RunCompleteWorkflow(ghRequest common.GHRequest) {
 
 		}
 		util.LogJson(ghResultInt)
-		return
+		return 2
 	}
 
 	util.LogJson(ghResultRuns)
+	return 1
 
 }
 
@@ -485,20 +405,31 @@ Helper function to fetch Jobstatus for a Run called from func RunCompleteWorkflo
 func GetRunJobStatus(ghRequest common.GHRequest, run common.GHWorkflowRun) common.GHResult[common.GHJobInfo] {
 
 	ghRequest.ID = strconv.Itoa(run.ID)
-
+	ghJobRequest := ghRequest
+	jobLogs := []int{}
 	for {
 		ghResult := GetJobsByRunId(ghRequest)
 		ghJobInfo := ghResult.Result
+
 		if ghResult.StatusCode > 199 && ghResult.StatusCode < 400 {
 			jobCount := 0
 			for i := 0; i < len(ghJobInfo.Jobs); i++ {
 				job := ghJobInfo.Jobs[i]
 				if job.Conclusion == "success" {
+					if !slices.Contains(jobLogs, job.ID) {
+						ghJobRequest.ID = strconv.Itoa(job.ID)
+						ghJobLogResult := GetJobLogsByJobId(ghJobRequest)
+						if ghJobLogResult.StatusCode < 400 {
+							util.LogJson(ghJobLogResult.Result.Logs)
+						}
+						jobLogs = append(jobLogs, job.ID)
+						util.Log("jobLpgs:", jobLogs)
+					}
 					jobCount++
 				}
 
 			}
-			util.Log("jobCount:", jobCount, " Jobs : ", len(ghJobInfo.Jobs))
+
 			if jobCount == len(ghJobInfo.Jobs) {
 				ghJobInfo.Conclusion = "success"
 				ghJobInfo.Status = "completed"
@@ -517,6 +448,7 @@ func GetRunJobStatus(ghRequest common.GHRequest, run common.GHWorkflowRun) commo
 
 		}
 		ghResult.Result = ghJobInfo
+
 		util.LogJson(ghResult)
 		if ghJobInfo.Conclusion == "success" || ghJobInfo.Conclusion == "failed" {
 			util.Log("Returning...")

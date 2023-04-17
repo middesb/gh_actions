@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 func JsonPrettyPrint(in string) string {
@@ -29,18 +30,26 @@ func Log(vals ...interface{}) {
 func FetchObjectFromBody(resp *http.Response, v any) string {
 	body, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
-
 	if err != nil {
 		return "Error while reading the response bytes:" + err.Error()
 	}
 	body = bytes.TrimPrefix(body, []byte("\xef\xbb\xbf"))
 	err = json.Unmarshal(body, v)
+
 	if err != nil {
 		return "Error while Unmarshalling the response bytes:" + err.Error()
 	}
 	return ""
 }
 
+func FetchResponseFromString(str string) http.Response {
+
+	fbUserDataResponse := http.Response{
+		Body: ioutil.NopCloser(bytes.NewBufferString(string(str))),
+	}
+
+	return fbUserDataResponse
+}
 func HealthCheck(w http.ResponseWriter) {
 	fmt.Fprintf(w, "Healthy..")
 }
@@ -64,23 +73,21 @@ func LogJson(v any) {
 	log.Println(JsonPrettyPrint(string(b)))
 }
 
-func WriteResult(v any) {
-	path := "/app/ghactions-data/data.txt"
+func WriteResult(path string, v any) {
 	b, err := json.Marshal(v)
 	if err != nil {
 		Log("WriteFile: err", err)
 		return
 	}
-	err = os.WriteFile(path, b, 0644)
+	err = os.WriteFile(path+"/result.txt", b, 0644)
 	if err != nil {
 		fmt.Println("WriteFile: err", err)
 		return
 	}
 
 }
-func ReadResult(v any) {
-	path := "/app/ghactions-data/data.txt"
-	dat, err := os.ReadFile(path)
+func ReadResult(path string, v any) {
+	dat, err := os.ReadFile(path + "/result.txt")
 	if err != nil {
 		fmt.Println("ReadFile: err", err)
 		v = nil
@@ -112,5 +119,15 @@ func InitStorage() {
 		if err != nil {
 			Log(err)
 		}
+	}
+}
+
+func ParseGHADate(dtStr string) (time.Time, error) {
+	tt, err := time.Parse(time.RFC3339, dtStr)
+	if err != nil {
+		Log(err)
+		return tt, err
+	} else {
+		return tt, nil
 	}
 }
